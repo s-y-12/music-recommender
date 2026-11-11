@@ -210,3 +210,77 @@ else:
     if st.button("🔄 もう一度診断する", use_container_width=True):
         st.session_state.started = False
         st.rerun()
+
+    # ==========================================================================
+    # 被験者実験用アンケートフォーム
+    # ==========================================================================
+    st.markdown("---")
+    st.subheader("📋 実験アンケートへのご協力のお願い")
+    st.caption("研究の評価データとして使用します。診断結果を確認後、以下の回答にご協力をお願いいたします。")
+
+    # 既に送信済みかのフラグ確認
+    if 'survey_submitted' not in st.session_state:
+        st.session_state.survey_submitted = False
+
+    if not st.session_state.survey_submitted:
+        with st.form(key='eval_survey_form'):
+            q1 = st.slider(
+                "Q1. 「Top 5」の楽曲は、あなたの好みの声質・雰囲気に合致していましたか？",
+                min_value=1, max_value=5, value=3,
+                help="1: 全く合致していない 〜 5: 非常に合致している"
+            )
+            
+            q2 = st.slider(
+                "Q2. 「Top 5」と「Worst 5（対極）」を聴き比べた際、声質や雰囲気に明確な違いを感じましたか？",
+                min_value=1, max_value=5, value=3,
+                help="1: 全く違いを感じない 〜 5: 非常に明確な違いを感じた"
+            )
+            
+            q3 = st.radio(
+                "Q3. 「Top 5」の中に、これまで知らなかったが「好き・聴いてみたい」と思える未知の楽曲がありましたか？",
+                options=["あり", "なし"],
+                horizontal=True
+            )
+            
+            q4 = st.select_slider(
+                "Q4. 5ラウンドの直感的な試聴・選択操作はいかがでしたか？",
+                options=["1: とても使いづらい", "2: やや使いづらい", "3: 普通", "4: 使いやすい", "5: とても使いやすい"],
+                value="4: 使いやすい"
+            )
+            
+            q5 = st.text_area(
+                "Q5. 気づいたことや、印象に残った声質などがあればご自由にご記入ください（任意）",
+                placeholder="例：3ラウンド目で選んだ声と結果の1位がすごく似ていて納得感があった、など"
+            )
+            
+            submit_button = st.form_submit_button(label="送信する", type="primary", use_container_width=True)
+
+        if submit_button:
+            st.session_state.survey_submitted = True
+            
+            # 回答データの保存（セッション内データ）
+            survey_result = {
+                "Q1_Top5満足度": q1,
+                "Q2_Worst5ギャップ": q2,
+                "Q3_セレンディピティ": q3,
+                "Q4_操作性": q4[0], # 数字部分だけ抽出
+                "Q5_自由記述": q5
+            }
+            st.session_state.last_survey = survey_result
+            st.rerun()
+
+    else:
+        st.success("✅ アンケートのご協力ありがとうございました！回答が送信されました。")
+        
+        # 被験者の回答データをCSV化して保存・ダウンロード可能にする（研究分析用）
+        if 'last_survey' in st.session_state:
+            survey_df = pd.DataFrame([st.session_state.last_survey])
+            csv_data = survey_df.to_csv(index=False).encode('utf-8-sig')
+            
+            st.download_button(
+                label="📥 この回答結果データをダウンロード（実験者用）",
+                data=csv_data,
+                file_name="experiment_response.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
