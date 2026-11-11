@@ -43,14 +43,16 @@ def load_and_clean_data():
 
     # クレンジング処理
     if 'instrumentalness' in df.columns:
-        df = df[df['instrumentalness'] < 0.3]  # インスト除外
+        df = df[df['instrumentalness'] < 0.1]  # インスト除外
+    if 'speechiness' in df.columns:
+        df =df[df['speechiness'] >= 0.03]
     if 'popularity' in df.columns:
         df = df[df['popularity'] >= 15]        # 試聴不可対策
 
     df = df.drop_duplicates(subset=['name', 'artist']).copy().reset_index(drop=True)
 
     # 邦楽判定
-    japanese_pattern = r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]'
+    japanese_pattern = r'[\u3040-\u309F\u30A0-\u30FF]'
     df['is_japanese'] = df['name'].str.contains(japanese_pattern, na=False) | df['artist'].str.contains(japanese_pattern, na=False)
     
     return df
