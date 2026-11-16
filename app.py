@@ -181,7 +181,7 @@ else:
     top5 = final_pool.sort_values(by='match_score', ascending=False).head(5)
     worst5 = final_pool.sort_values(by='match_score', ascending=True).head(5)
     
-    tab1, tab2 = st.tabs(["✨ 一致度 Top 5（好みの声質）", "⚡ 対極 Worst 5（真逆の声質）"])
+    tab1, tab2, tab3 = st.tabs(["✨ 一致度 Top 5（好みの声質）", "⚡ 対極 Worst 5（真逆の声質）", "評価アンケート"])
     
     with tab1:
         st.markdown("### あなたの好みの声質とマッチした楽曲")
