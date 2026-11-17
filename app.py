@@ -288,7 +288,7 @@ else:
                 selected_names = " / ".join([t['name'] for t in tracks_history])
                 top1_name = top5.iloc[0]['name'] if len(top5) > 0 else ""
 
-                GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxsFHn67zZVU4s6CLO15B8lyu1TIgfhwMDXCnWJnB0EtEs0Kv9cP2iqGa6VLWBwxZ341A/exec"
+                GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwKzUlHn4s7GCLcSUeP9MU-ZipQKwwfPD2_1_o4CsfZZKq2LCDVqLDAZb99PGkqxsU0/exec"
                 
                 payload = {
                     "participant_id": st.session_state.participant_id,
