@@ -287,23 +287,35 @@ else:
                 tracks_history = st.session_state.get('selected_tracks', [])
                 selected_names = " / ".join([t['name'] for t in tracks_history])
                 top1_name = top5.iloc[0]['name'] if len(top5) > 0 else ""
+
+                GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwZwQmwSGhhVVFPyO3wkv3qqOPnM6CfG0SUCakkRhI18hkMSn5KdHemZhFmP224SZ9PXQ/exec"
                 
-                survey_result = {
-                    "被験者ID": st.session_state.participant_id,
-                    "Q1_Top5満足度": q1,
-                    "Q2_Worst5ギャップ": q2,
-                    "Q3_セレンディピティ": q3,
-                    "Q4_操作性": q4[0],
-                    "Q5_自由記述": q5,
-                    "選択した5曲": selected_names,
-                    "推薦Top1楽曲": top1_name
+                payload = {
+                    "participant_id": st.session_state.participant_id,
+                    "q1": q1,
+                    "q2": q2,
+                    "q3": q3,
+                    "q4": int(q4[0]),
+                    "q5": q5,
+                    "selected_names": selected_names,
+                    "top1_name": top1_name
                 }
-                st.session_state.last_survey = survey_result
-                st.rerun()
+
+                with st.spinner("回答データを送信中..."):
+                    try:
+                        res = requests.post(GAS_WEBAPP_URL, json=payload, timeout=10)
+                        if res.status_code == 200:
+                            st.session_state.survey_submitted = True
+                            st.rerun()
+                        else:
+                            st.error("送信エラーが発生しました。もう一度お試しください。")
+                    except Exception as e:
+                        st.error(f"通信エラーが発生しました: {e}")
 
         else:
-            st.success("✅ アンケートのご回答ありがとうございました！")
-            st.info("👇 下記のボタンを押して結果ファイル（CSV）をダウンロードし、実験担当者へ送信してください。")
+            st.success("✅ アンケートのご回答ありがとうございました！データは正常に記録されました。")
+            st.balloons()
+            st.write("ブラウザを閉じて実験を終了していただいて構いません。ご協力ありがとうございました！")
             
             if 'last_survey' in st.session_state:
                 survey_df = pd.DataFrame([st.session_state.last_survey])
