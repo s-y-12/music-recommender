@@ -288,7 +288,7 @@ else:
                 selected_names = " / ".join([t['name'] for t in tracks_history])
                 top1_name = top5.iloc[0]['name'] if len(top5) > 0 else ""
 
-                GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwZwQmwSGhhVVFPyO3wkv3qqOPnM6CfG0SUCakkRhI18hkMSn5KdHemZhFmP224SZ9PXQ/exec"
+                GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxsFHn67zZVU4s6CLO15B8lyu1TIgfhwMDXCnWJnB0EtEs0Kv9cP2iqGa6VLWBwxZ341A/exec"
                 
                 payload = {
                     "participant_id": st.session_state.participant_id,
@@ -303,7 +303,7 @@ else:
 
                 with st.spinner("回答データを送信中..."):
                     try:
-                        res = requests.post(GAS_WEBAPP_URL, json=payload, timeout=10)
+                        res = requests.post(GAS_WEBAPP_URL, data=payload, timeout=10)
                         if res.status_code == 200:
                             st.session_state.survey_submitted = True
                             st.rerun()
