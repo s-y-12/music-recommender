@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+from datetime import datetime
 
 # ==============================================================================
 # ページ初期設定
@@ -29,7 +30,6 @@ def load_and_clean_data():
     elif os.path.exists('dataset.csv'):
         df = pd.read_csv('dataset.csv')
     else:
-        # オンライン上のデータセットを取得（FileNotFoundErrorを100%防ぎます）
         url = 'https://huggingface.co/datasets/maharshipandya/spotify-tracks-dataset/resolve/main/dataset.csv'
         df = pd.read_csv(url)
 
@@ -45,13 +45,13 @@ def load_and_clean_data():
     if 'instrumentalness' in df.columns:
         df = df[df['instrumentalness'] < 0.1]  # インスト除外
     if 'speechiness' in df.columns:
-        df =df[df['speechiness'] >= 0.03]
+        df = df[df['speechiness'] >= 0.03]     # 無歌唱排除
     if 'popularity' in df.columns:
         df = df[df['popularity'] >= 15]        # 試聴不可対策
 
     df = df.drop_duplicates(subset=['name', 'artist']).copy().reset_index(drop=True)
 
-    # 邦楽判定
+    # 邦楽判定（ひらがな・カタカナのみで判定し中国語曲を除外）
     japanese_pattern = r'[\u3040-\u309F\u30A0-\u30FF]'
     df['is_japanese'] = df['name'].str.contains(japanese_pattern, na=False) | df['artist'].str.contains(japanese_pattern, na=False)
     
@@ -90,14 +90,22 @@ def render_spotify_player(track_id, height=80):
     st.components.v1.html(iframe_html, height=height+10)
 
 # ==============================================================================
-# 3. セッション状態の初期化
+# 3. セッション状態の初期化（エラー防止の安全設計）
 # ==============================================================================
 if 'started' not in st.session_state:
     st.session_state.started = False
+if 'round' not in st.session_state:
     st.session_state.round = 1
+if 'selected_vectors' not in st.session_state:
     st.session_state.selected_vectors = []
+if 'selected_tracks' not in st.session_state:
+    st.session_state.selected_tracks = []
+if 'used_track_ids' not in st.session_state:
     st.session_state.used_track_ids = []
+if 'current_candidates' not in st.session_state:
     st.session_state.current_candidates = None
+if 'survey_submitted' not in st.session_state:
+    st.session_state.survey_submitted = False
 
 # ==============================================================================
 # 4. メインUI表示
@@ -108,12 +116,15 @@ st.caption("直感的に惹かれるボーカルの声を選んでいくこと�
 # --- スタート画面 ---
 if not st.session_state.started:
     st.markdown("---")
-    st.info("💡 各ラウンドで3つのボーカル楽曲を試聴し、最も「惹かれる声・質感」の曲を1つ選んでください（全5ラウンド）。")
+    st.info("💡 各ラウンドで3つのボーカル楽曲を試聴し、最も「惹かれる声・質感」の曲を1つ選んでください（全5ラウンド）。\n\n※イントロが長い曲は、プレイヤーの再生バーを少し進めて**歌声のパート**で判断してください。")
     if st.button("🚀 診断をスタートする", type="primary", use_container_width=True):
         st.session_state.started = True
         st.session_state.round = 1
         st.session_state.selected_vectors = []
+        st.session_state.selected_tracks = []
         st.session_state.used_track_ids = []
+        st.session_state.survey_submitted = False
+        st.session_state.participant_id = f"P_{datetime.now().strftime('%m%d_%H%M%S')}"
         st.session_state.current_candidates = sample_balanced_candidates(df_pool, [], count=NUM_CHOICES)
         st.rerun()
 
@@ -142,6 +153,7 @@ elif st.session_state.round <= TOTAL_ROUNDS:
             if st.button(f"この声が好き 👍", key=f"btn_{r}_{idx}", use_container_width=True):
                 chosen_vector = track[FEATURES].values.astype(float)
                 st.session_state.selected_vectors.append(chosen_vector)
+                st.session_state.selected_tracks.append(track.to_dict())
                 st.session_state.used_track_ids.extend(candidates['id'].tolist())
                 
                 if st.session_state.round < TOTAL_ROUNDS:
@@ -181,7 +193,12 @@ else:
     top5 = final_pool.sort_values(by='match_score', ascending=False).head(5)
     worst5 = final_pool.sort_values(by='match_score', ascending=True).head(5)
     
-    tab1, tab2, tab3 = st.tabs(["✨ 一致度 Top 5（好みの声質）", "⚡ 対極 Worst 5（真逆の声質）", "評価アンケート"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "✨ 一致度 Top 5（好みの声質）", 
+        "🎵 あなたが選んだ楽曲（履歴）",
+        "⚡ 対極 Worst 5（真逆の声質）", 
+        "📋 評価アンケート"
+    ])
     
     with tab1:
         st.markdown("### あなたの好みの声質とマッチした楽曲")
@@ -197,7 +214,19 @@ else:
             st.divider()
 
     with tab2:
-        st.markdown("### あなたの好みの声質と正反対の楽曲")
+        st.markdown("### 各ラウンドであなたが「この声が好き」と選択した楽曲")
+        for idx, track in enumerate(st.session_state.selected_tracks):
+            lang = "🎌 邦楽" if track.get('is_japanese', False) else "🌍 洋楽"
+            c1, c2 = st.columns([2, 3])
+            with c1:
+                st.markdown(f"#### Round {idx+1}: {track['name']}")
+                st.write(f"**{track['artist']}** ({lang})")
+            with c2:
+                render_spotify_player(track['id'])
+            st.divider()
+
+    with tab3:
+        st.markdown("### あなたの好みの声質と正反対の楽曲（※実験検証用）")
         for idx, (_, track) in enumerate(worst5.iterrows()):
             lang = "🎌 邦楽" if track['is_japanese'] else "🌍 洋楽"
             c1, c2 = st.columns([2, 3])
@@ -209,24 +238,18 @@ else:
                 render_spotify_player(track['id'])
             st.divider()
 
-    # ==========================================================================
-    # 被験者実験用アンケートフォーム
-    # ==========================================================================
-    # --- アンケート専用タブ（CSVダウンロード方式） ---
-    with tab3:
+    # --- アンケート専用タブ（自動被験者ID付与＆CSVダウンロード） ---
+    with tab4:
         st.markdown("### 📋 実験アンケートへのご協力のお願い")
         st.caption("研究の評価データとして使用します。各タブの診断結果・選択履歴を確認後、以下の回答にご協力をお願いいたします。")
 
-        if 'survey_submitted' not in st.session_state:
-            st.session_state.survey_submitted = False
+        if 'participant_id' not in st.session_state:
+            st.session_state.participant_id = f"P_{datetime.now().strftime('%m%d_%H%M%S')}"
+
+        st.info(f"🆔 あなたの被験者ID: **{st.session_state.participant_id}** （自動発行・入力不要）")
 
         if not st.session_state.survey_submitted:
             with st.form(key='eval_survey_form'):
-                participant_name = st.text_input(
-                    "お名前（またはニックネーム・被験者ID）",
-                    placeholder="例：被験者A、山田 など"
-                )
-
                 q1 = st.slider(
                     "Q1. 「Top 5」の楽曲は、あなたの好みの声質・雰囲気に合致していましたか？",
                     min_value=1, max_value=5, value=3,
@@ -261,12 +284,12 @@ else:
             if submit_button:
                 st.session_state.survey_submitted = True
                 
-                # 選択履歴とTop1の楽曲名も分析用に自動記録
-                selected_names = " / ".join([t['name'] for t in st.session_state.selected_tracks])
+                tracks_history = st.session_state.get('selected_tracks', [])
+                selected_names = " / ".join([t['name'] for t in tracks_history])
                 top1_name = top5.iloc[0]['name'] if len(top5) > 0 else ""
                 
                 survey_result = {
-                    "被験者": participant_name if participant_name else "未記入",
+                    "被験者ID": st.session_state.participant_id,
                     "Q1_Top5満足度": q1,
                     "Q2_Worst5ギャップ": q2,
                     "Q3_セレンディピティ": q3,
@@ -286,16 +309,20 @@ else:
                 survey_df = pd.DataFrame([st.session_state.last_survey])
                 csv_data = survey_df.to_csv(index=False).encode('utf-8-sig')
                 
-                p_label = st.session_state.last_survey.get("被験者", "user")
+                p_id = st.session_state.participant_id
                 st.download_button(
-                    label="📥 回答結果CSVをダウンロードする",
+                    label=f"📥 回答結果CSVをダウンロードする (survey_{p_id}.csv)",
                     data=csv_data,
-                    file_name=f"survey_{p_label}.csv",
+                    file_name=f"survey_{p_id}.csv",
                     mime="text/csv",
                     type="primary",
                     use_container_width=True
                 )
+
     st.markdown("---")
     if st.button("🔄 もう一度診断する", use_container_width=True):
         st.session_state.started = False
+        st.session_state.survey_submitted = False
+        if 'participant_id' in st.session_state:
+            del st.session_state['participant_id']
         st.rerun()
