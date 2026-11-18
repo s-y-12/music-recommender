@@ -303,7 +303,7 @@ else:
 
                 with st.spinner("回答データを送信中..."):
                     try:
-                        res = requests.post(GAS_WEBAPP_URL, data=payload, timeout=10)
+                        res = requests.post(GAS_WEBAPP_URL, params=payload, timeout=30)
                         if res.status_code == 200:
                             st.session_state.survey_submitted = True
                             st.rerun()
